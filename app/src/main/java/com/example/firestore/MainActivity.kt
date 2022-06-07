@@ -4,8 +4,10 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.firestore.ktx.toObject
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,23 +27,64 @@ class MainActivity : AppCompatActivity() {
     //take out particular collection reference
     private val personCollectionRef = fireStoreDb.collection("persons")
 
+        //assign views using findViewByID
+        lateinit var  btnUploadData  : Button
+    lateinit var  etFirstName : EditText
+    lateinit var  etLastName  : EditText
+    lateinit var  etAge  : EditText
+    lateinit var btnRetieveData : Button
+    lateinit var tvPerson : TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-      val  btnUploadData  = findViewById<Button>(R.id.btnUploadData)
-        val  etFirstName  = findViewById<EditText>(R.id.etFirstName)
-        val  etLastName  = findViewById<EditText>(R.id.etLastName)
-        val  etAge  = findViewById<EditText>(R.id.etAge)
+        btnUploadData  = findViewById(R.id.btnUploadData)
+        etFirstName  = findViewById(R.id.etFirstName)
+        etLastName  = findViewById(R.id.etLastName)
+        etAge  = findViewById(R.id.etAge)
+        btnRetieveData = findViewById(R.id.btnRetrieveData)
+        tvPerson = findViewById(R.id.tvPersons)
 
         btnUploadData.setOnClickListener{
             val firstName = etFirstName.text.toString()
             val lastName =  etLastName.text.toString()
-            val age =  etAge.text.toString()
+            val age =  etAge.text.toString().toInt()
             val person = Person(firstName, lastName, age)
             savePerson(person)
         }
+        btnRetieveData.setOnClickListener {
+            retrievePersons()
+        }
+
     }
+
+    private fun retrievePersons() = CoroutineScope(Dispatchers.IO).launch {
+        try {
+            //create querySnapShot - it is result of our query to fireStore
+            // we get all available documents inside of our collection
+            //when we have task we can call await()
+            val querySnapshot = personCollectionRef.get().await()
+            // now we can use querySnapshot to loop over the documents
+            val sb = StringBuilder()
+            //querySnapShot contains group of documentSnapshot
+            //documentSnapShot contain information about particular document
+            for(document in querySnapshot.documents){
+                val person = document.toObject<Person>()
+                sb.append("$person\n")
+                // we get data from document and convert the data to person class
+            }
+            withContext(Dispatchers.Main){
+tvPerson.text = sb.toString()
+            }
+
+        }catch (e:Exception){
+            withContext(Dispatchers.Main){
+                Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+            }
+
 
     private fun savePerson(person: Person) = CoroutineScope(Dispatchers.IO).launch {
         try {
