@@ -53,11 +53,31 @@ class MainActivity : AppCompatActivity() {
             val person = Person(firstName, lastName, age)
             savePerson(person)
         }
-        btnRetieveData.setOnClickListener {
+        subscribeToRealTimeUpdates()
+       /*btnRetieveData.setOnClickListener {
             retrievePersons()
-        }
-
+        }*/
     }
+
+
+    private fun subscribeToRealTimeUpdates(){
+        personCollectionRef.addSnapshotListener { querySnapshot, firebaseFirestoreException ->
+            firebaseFirestoreException?.let {
+                Toast.makeText(this, it.message, Toast.LENGTH_SHORT).show()
+                return@addSnapshotListener
+            }
+            querySnapshot?.let {
+            val sb = StringBuilder()
+                for(document in querySnapshot.documents){
+                    val person = document.toObject<Person>()
+                    sb.append("$person\n")
+                    // we get data from document and convert the data to person class
+                }
+                tvPerson.text = sb.toString()
+            }
+        }
+    }
+
 
     private fun retrievePersons() = CoroutineScope(Dispatchers.IO).launch {
         try {
@@ -75,7 +95,7 @@ class MainActivity : AppCompatActivity() {
                 // we get data from document and convert the data to person class
             }
             withContext(Dispatchers.Main){
-tvPerson.text = sb.toString()
+                tvPerson.text = sb.toString()
             }
 
         }catch (e:Exception){
