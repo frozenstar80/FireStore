@@ -9,6 +9,7 @@ import android.widget.Toast
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.firestore.ktx.toObject
 import com.google.firebase.ktx.Firebase
+import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,10 +54,10 @@ class MainActivity : AppCompatActivity() {
             val person = Person(firstName, lastName, age)
             savePerson(person)
         }
-        subscribeToRealTimeUpdates()
-       /*btnRetieveData.setOnClickListener {
+
+       btnRetieveData.setOnClickListener {
             retrievePersons()
-        }*/
+        }
     }
 
 
@@ -80,11 +81,18 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun retrievePersons() = CoroutineScope(Dispatchers.IO).launch {
+        val fromAge = etFrom.text.toString().toInt()
+        val toAge = etTo.text.toString().toInt()
+
         try {
             //create querySnapShot - it is result of our query to fireStore
-            // we get all available documents inside of our collection
-            //when we have task we can call await()
-            val querySnapshot = personCollectionRef.get().await()
+           //we will get quries to firestore using collection object
+            val querySnapshot = personCollectionRef
+                .whereGreaterThan("age",fromAge)
+                .whereLessThan("age",toAge)
+                .orderBy("age")
+                .get()
+                .await()
             // now we can use querySnapshot to loop over the documents
             val sb = StringBuilder()
             //querySnapShot contains group of documentSnapshot
