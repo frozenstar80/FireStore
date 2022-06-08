@@ -6,6 +6,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.firestore.ktx.toObject
 import com.google.firebase.ktx.Firebase
@@ -48,11 +49,13 @@ class MainActivity : AppCompatActivity() {
         tvPerson = findViewById(R.id.tvPersons)
 
         btnUploadData.setOnClickListener{
-            val firstName = etFirstName.text.toString()
-            val lastName =  etLastName.text.toString()
-            val age =  etAge.text.toString().toInt()
-            val person = Person(firstName, lastName, age)
-            savePerson(person)
+            val person = getOldPerson()
+                savePerson(person)
+        }
+        btnUpdatePerson.setOnClickListener {
+            val oldPerson = getOldPerson()
+            val newPersonMap = getNewPerson()
+            updatePerson(oldPerson, newPersonMap)
         }
 
        btnRetieveData.setOnClickListener {
@@ -60,6 +63,61 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun getOldPerson() : Person{
+        val firstName = etFirstName.text.toString()
+        val lastName =  etLastName.text.toString()
+        val age =  etAge.text.toString().toInt()
+       return Person(firstName, lastName, age)
+    }
+
+    private fun getNewPerson() : Map<String,Any>{
+        //we will create a map of type string and any as field can have different type values
+        val firstName = etNewFirstName.text.toString()
+        val lastName =  etNewLastName.text.toString()
+        val age =  etNewAge.text.toString()
+        //wont convert age from string to int .
+    // If edit text as empty value then conversion from string to int will throw error
+        //create mutable map
+        val map =  mutableMapOf<String,Any>()
+        if(firstName.isNotEmpty()){
+            map["firstName"] = firstName
+        }
+        if(lastName.isNotEmpty()){
+            map["firstName"] = lastName
+        }
+        if(age.isNotEmpty()){
+            map["firstName"] = age.toInt()
+        }
+ return  map
+    }
+
+    private fun updatePerson(person: Person, newPersonMap: Map<String, Any>) = CoroutineScope(Dispatchers.IO).launch {
+        val personQuery = personCollectionRef
+            .whereEqualTo("firstName", person.firstName)
+            .whereEqualTo("lastName", person.lastName)
+            .whereEqualTo("age", person.age)
+            .get()
+            .await()
+        if(personQuery.documents.isNotEmpty()) {
+            for(document in personQuery) {
+                try {
+                    //personCollectionRef.document(document.id).update("age", newAge).await()
+                    personCollectionRef.document(document.id).set(
+                        newPersonMap,
+                        SetOptions.merge()
+                    ).await()
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        } else {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "No persons matched the query.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     private fun subscribeToRealTimeUpdates(){
         personCollectionRef.addSnapshotListener { querySnapshot, firebaseFirestoreException ->
@@ -86,7 +144,7 @@ class MainActivity : AppCompatActivity() {
 
         try {
             //create querySnapShot - it is result of our query to fireStore
-           //we will get quries to firestore using collection object
+           //we will get queries to firestore using collection object
             val querySnapshot = personCollectionRef
                 .whereGreaterThan("age",fromAge)
                 .whereLessThan("age",toAge)
