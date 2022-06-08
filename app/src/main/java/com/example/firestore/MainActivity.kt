@@ -30,31 +30,31 @@ class MainActivity : AppCompatActivity() {
     //take out particular collection reference
     private val personCollectionRef = fireStoreDb.collection("persons")
 
-        //assign views using findViewByID
-        lateinit var  btnUploadData  : Button
-    lateinit var  etFirstName : EditText
-    lateinit var  etLastName  : EditText
-    lateinit var  etAge  : EditText
-    lateinit var btnRetieveData : Button
-    lateinit var tvPerson : TextView
+    //assign views using findViewByID
+    lateinit var btnUploadData: Button
+    lateinit var etFirstName: EditText
+    lateinit var etLastName: EditText
+    lateinit var etAge: EditText
+    lateinit var btnRetieveData: Button
+    lateinit var tvPerson: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        btnUploadData  = findViewById(R.id.btnUploadData)
-        etFirstName  = findViewById(R.id.etFirstName)
-        etLastName  = findViewById(R.id.etLastName)
-        etAge  = findViewById(R.id.etAge)
+        btnUploadData = findViewById(R.id.btnUploadData)
+        etFirstName = findViewById(R.id.etFirstName)
+        etLastName = findViewById(R.id.etLastName)
+        etAge = findViewById(R.id.etAge)
         btnRetieveData = findViewById(R.id.btnRetrieveData)
         tvPerson = findViewById(R.id.tvPersons)
 
-        btnUploadData.setOnClickListener{
+        btnUploadData.setOnClickListener {
             val person = getOldPerson()
-                savePerson(person)
+            savePerson(person)
         }
         btnDeletePerson.setOnClickListener {
-            val person =  getOldPerson()
+            val person = getOldPerson()
             deletePerson(person)
         }
         btnUpdatePerson.setOnClickListener {
@@ -63,39 +63,62 @@ class MainActivity : AppCompatActivity() {
             updatePerson(oldPerson, newPersonMap)
         }
 
-       btnRetieveData.setOnClickListener {
+        btnRetieveData.setOnClickListener {
             retrievePersons()
         }
+        btnBatchWrite.setOnClickListener {
+            changeName("53JKc96jvNuI9xMb74MV", "Elon", "Musk")
+            //change id here
+        }
     }
 
-    private fun getOldPerson() : Person{
+    private fun getOldPerson(): Person {
         val firstName = etFirstName.text.toString()
-        val lastName =  etLastName.text.toString()
-        val age =  etAge.text.toString().toInt()
-       return Person(firstName, lastName, age)
+        val lastName = etLastName.text.toString()
+        val age = etAge.text.toString().toInt()
+        return Person(firstName, lastName, age)
     }
 
-    private fun getNewPerson() : Map<String,Any>{
+    private fun getNewPerson(): Map<String, Any> {
         //we will create a map of type string and any as field can have different type values
         val firstName = etNewFirstName.text.toString()
-        val lastName =  etNewLastName.text.toString()
-        val age =  etNewAge.text.toString()
+        val lastName = etNewLastName.text.toString()
+        val age = etNewAge.text.toString()
         //wont convert age from string to int .
-    // If edit text as empty value then conversion from string to int will throw error
+        // If edit text as empty value then conversion from string to int will throw error
         //create mutable map
-        val map =  mutableMapOf<String,Any>()
-        if(firstName.isNotEmpty()){
+        val map = mutableMapOf<String, Any>()
+        if (firstName.isNotEmpty()) {
             map["firstName"] = firstName
         }
-        if(lastName.isNotEmpty()){
+        if (lastName.isNotEmpty()) {
             map["firstName"] = lastName
         }
-        if(age.isNotEmpty()){
+        if (age.isNotEmpty()) {
             map["firstName"] = age.toInt()
         }
- return  map
+        return map
     }
 
+    //batched write make sure all of its write  wil be executed or none
+    //we will create a function to chnage first and last name of a person
+    private fun changeName(
+        personId: String,
+        newFirstName: String,
+        newLastName: String
+    ) = CoroutineScope(Dispatchers.IO).launch {
+        try {
+            Firebase.firestore.runBatch { batch ->
+                val personRef = personCollectionRef.document(personId)
+                batch.update(personRef, "firstName", newFirstName)
+                batch.update(personRef, "lastName", newLastName)
+            }.await()
+        } catch(e: Exception) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
 
     private fun deletePerson(person: Person) = CoroutineScope(Dispatchers.IO).launch {
@@ -105,15 +128,16 @@ class MainActivity : AppCompatActivity() {
             .whereEqualTo("age", person.age)
             .get()
             .await()
-        if(personQuery.documents.isNotEmpty()) {
-            for(document in personQuery) {
+        if (personQuery.documents.isNotEmpty()) {
+            for (document in personQuery) {
                 try {
                     //for deleting whole document
 //                    personCollectionRef.document(document.id).delete().await()
                     //for deleting particular field of a document
-                    personCollectionRef.document(document.id).update(mapOf(
-                        "firstName" to FieldValue.delete()
-                    )
+                    personCollectionRef.document(document.id).update(
+                        mapOf(
+                            "firstName" to FieldValue.delete()
+                        )
                     )
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -123,49 +147,58 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             withContext(Dispatchers.Main) {
-                Toast.makeText(this@MainActivity, "No persons matched the query.", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this@MainActivity,
+                    "No persons matched the query.",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
 
 
-    private fun updatePerson(person: Person, newPersonMap: Map<String, Any>) = CoroutineScope(Dispatchers.IO).launch {
-        val personQuery = personCollectionRef
-            .whereEqualTo("firstName", person.firstName)
-            .whereEqualTo("lastName", person.lastName)
-            .whereEqualTo("age", person.age)
-            .get()
-            .await()
-        if(personQuery.documents.isNotEmpty()) {
-            for(document in personQuery) {
-                try {
-                    //personCollectionRef.document(document.id).update("age", newAge).await()
-                    personCollectionRef.document(document.id).set(
-                        newPersonMap,
-                        SetOptions.merge()
-                    ).await()
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
+    private fun updatePerson(person: Person, newPersonMap: Map<String, Any>) =
+        CoroutineScope(Dispatchers.IO).launch {
+            val personQuery = personCollectionRef
+                .whereEqualTo("firstName", person.firstName)
+                .whereEqualTo("lastName", person.lastName)
+                .whereEqualTo("age", person.age)
+                .get()
+                .await()
+            if (personQuery.documents.isNotEmpty()) {
+                for (document in personQuery) {
+                    try {
+                        //personCollectionRef.document(document.id).update("age", newAge).await()
+                        personCollectionRef.document(document.id).set(
+                            newPersonMap,
+                            SetOptions.merge()
+                        ).await()
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
-            }
-        } else {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(this@MainActivity, "No persons matched the query.", Toast.LENGTH_LONG).show()
+            } else {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "No persons matched the query.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
-    }
 
-    private fun subscribeToRealTimeUpdates(){
+    private fun subscribeToRealTimeUpdates() {
         personCollectionRef.addSnapshotListener { querySnapshot, firebaseFirestoreException ->
             firebaseFirestoreException?.let {
                 Toast.makeText(this, it.message, Toast.LENGTH_SHORT).show()
                 return@addSnapshotListener
             }
             querySnapshot?.let {
-            val sb = StringBuilder()
-                for(document in querySnapshot.documents){
+                val sb = StringBuilder()
+                for (document in querySnapshot.documents) {
                     val person = document.toObject<Person>()
                     sb.append("$person\n")
                     // we get data from document and convert the data to person class
@@ -182,10 +215,10 @@ class MainActivity : AppCompatActivity() {
 
         try {
             //create querySnapShot - it is result of our query to fireStore
-           //we will get queries to firestore using collection object
+            //we will get queries to firestore using collection object
             val querySnapshot = personCollectionRef
-                .whereGreaterThan("age",fromAge)
-                .whereLessThan("age",toAge)
+                .whereGreaterThan("age", fromAge)
+                .whereLessThan("age", toAge)
                 .orderBy("age")
                 .get()
                 .await()
@@ -193,21 +226,21 @@ class MainActivity : AppCompatActivity() {
             val sb = StringBuilder()
             //querySnapShot contains group of documentSnapshot
             //documentSnapShot contain information about particular document
-            for(document in querySnapshot.documents){
+            for (document in querySnapshot.documents) {
                 val person = document.toObject<Person>()
                 sb.append("$person\n")
                 // we get data from document and convert the data to person class
             }
-            withContext(Dispatchers.Main){
+            withContext(Dispatchers.Main) {
                 tvPerson.text = sb.toString()
             }
 
-        }catch (e:Exception){
-            withContext(Dispatchers.Main){
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
                 Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_SHORT).show()
             }
         }
-            }
+    }
 
 
     private fun savePerson(person: Person) = CoroutineScope(Dispatchers.IO).launch {
@@ -215,11 +248,12 @@ class MainActivity : AppCompatActivity() {
 
             //await() is used to wait thread till uploading data is finished
             personCollectionRef.add(person).await()
-            withContext(Dispatchers.Main){
-                Toast.makeText(this@MainActivity, "Data Successfully saved", Toast.LENGTH_SHORT).show()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Data Successfully saved", Toast.LENGTH_SHORT)
+                    .show()
             }
-        }catch (e: Exception){
-            withContext(Dispatchers.Main){
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
                 Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_SHORT).show()
             }
         }
