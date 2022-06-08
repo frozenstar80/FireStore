@@ -6,6 +6,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.firestore.ktx.toObject
@@ -52,6 +53,10 @@ class MainActivity : AppCompatActivity() {
             val person = getOldPerson()
                 savePerson(person)
         }
+        btnDeletePerson.setOnClickListener {
+            val person =  getOldPerson()
+            deletePerson(person)
+        }
         btnUpdatePerson.setOnClickListener {
             val oldPerson = getOldPerson()
             val newPersonMap = getNewPerson()
@@ -90,6 +95,39 @@ class MainActivity : AppCompatActivity() {
         }
  return  map
     }
+
+
+
+    private fun deletePerson(person: Person) = CoroutineScope(Dispatchers.IO).launch {
+        val personQuery = personCollectionRef
+            .whereEqualTo("firstName", person.firstName)
+            .whereEqualTo("lastName", person.lastName)
+            .whereEqualTo("age", person.age)
+            .get()
+            .await()
+        if(personQuery.documents.isNotEmpty()) {
+            for(document in personQuery) {
+                try {
+                    //for deleting whole document
+//                    personCollectionRef.document(document.id).delete().await()
+                    //for deleting particular field of a document
+                    personCollectionRef.document(document.id).update(mapOf(
+                        "firstName" to FieldValue.delete()
+                    )
+                    )
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        } else {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "No persons matched the query.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
 
     private fun updatePerson(person: Person, newPersonMap: Map<String, Any>) = CoroutineScope(Dispatchers.IO).launch {
         val personQuery = personCollectionRef
